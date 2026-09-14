@@ -1,0 +1,116 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>Infolume</AssemblyName>
+    <RootNamespace>Infolume</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+
+    <!-- Per-monitor v2 is essential, not cosmetic: the tray icon is repainted at
+         the icon's own monitor DPI and the flyout is laid out against the DPI of
+         the monitor it is about to appear on. Declared here rather than in the
+         manifest, which is what modern WinForms expects (WFO0003). -->
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+  </PropertyGroup>
+
+  <!-- Analysis. The .NET analyzers are on by default for net5.0+; naming them
+       here is deliberate, so it is visible that they are relied on rather than
+       inherited. EnforceCodeStyleInBuild is the one that actually earns its
+       place: without it the IDExxxx rules - including "unused private member",
+       which is how a duplicate copy of the autostart logic sat in TrayApp
+       unnoticed - are editor-only suggestions and never reach a build log.
+       .editorconfig decides which of them are worth a warning; the default
+       there is "none", because this code is settled and a style sweep over it
+       would be churn, not improvement. -->
+  <PropertyGroup>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>0.1.2</Version>
+    <Product>Infolume</Product>
+    <Company>Infolume</Company>
+    <Description>Tray audio readout: active device and volume at a glance.</Description>
+    <Copyright>(c) 2026 Kinyeka Labs. MIT licensed, see LICENSE.</Copyright>
+    <ApplicationIcon>app.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <SelfContained>true</SelfContained>
+    <PublishSingleFile>true</PublishSingleFile>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
+    <IncludeNativeLibrariesForSelfExtract>true</IncludeNativeLibrariesForSelfExtract>
+
+    <!-- OFF, and counter-intuitively that is the faster setting here.
+
+         ReadyToRun precompiles IL, which normally trades size for startup. It
+         does not, in a single-file build with EnableCompressionInSingleFile:
+         the R2R code makes the compressed payload substantially larger, and the
+         whole payload is decompressed on every launch. That cost lands before
+         any of the precompiled code can pay for itself.
+
+         Measured on this tree, launch to tray constructed, median of 9 runs,
+         repeated twice:
+
+           ReadyToRun on   52.2 MB   342 ms      <- was shipped in 0.1.0
+           ReadyToRun off  47.6 MB   281 ms
+
+         Uncompressed builds show the textbook behaviour and confirm the cause -
+         R2R on is 221 ms against 247 ms off - but they are 104-119 MB, which is
+         the wrong direction for a download.
+
+         First flyout open is the one place R2R still helps, at 61 ms against
+         76 ms. That is a real 15 ms, and it does not come close to paying for
+         65 ms at every launch on an app that starts at login.
+
+         So: smaller AND faster. Turn it back on only with a measurement that
+         says otherwise. -->
+    <PublishReadyToRun>false</PublishReadyToRun>
+
+    <!-- Trimming and NativeAOT MUST stay off, and this is not a size preference.
+         Two things in this app break under them:
+
+         1. TrayPositioning reads NotifyIcon's private `window` and `id` fields by
+            reflection - the only way to identify the icon to Shell_NotifyIconGetRect.
+            A trimmer sees no reference to those fields and removes them.
+         2. IPolicyConfig is a built-in COM interop interface, which NativeAOT does
+            not support; default-device switching would fail at runtime.
+
+         Both failures are silent at build time and only appear when a user clicks
+         something. Leave these false. -->
+    <PublishTrimmed>false</PublishTrimmed>
+    <PublishAot>false</PublishAot>
+    <TrimMode>copyused</TrimMode>
+
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <DebugType>embedded</DebugType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="NAudio" Version="3.1.0" />
+  </ItemGroup>
+
+  <!-- The pure logic worth unit-testing (TrayIconLocator, TrayApp.Tooltip) is
+       internal because nothing outside the app has any business calling it.
+       Tests get in this way rather than by widening the public surface. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="Infolume.Tests" />
+  </ItemGroup>
+
+  <!-- Design-comparison renderers, reachable only through the render dev modes.
+       Kept in the tree because they are how icon changes get reviewed, but
+       excluded from Release so a shipped binary does not carry them. The
+       matching call sites in Program.cs are guarded with #if DEBUG. -->
+  <ItemGroup Condition="'$(Configuration)' == 'Release'">
+    <Compile Remove="Icons/*Sheet.cs" />
+  </ItemGroup>
+
+</Project>

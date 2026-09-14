@@ -1,0 +1,41 @@
+# Analyzer configuration for Infolume.
+#
+# Scope on purpose. The .NET analyzers ship with a large default rule set, and
+# most of what they would say about this codebase is a matter of taste on code
+# that is already settled. Turning that noise into build warnings would train
+# everyone to ignore the build log, which is the opposite of the point.
+#
+# So: style rules are off, and the rules kept as warnings are the ones that
+# report something a reader would want to know is there - dead members, dead
+# usings, dead locals, and unreachable code. That family is what let a second,
+# unreferenced copy of the HKCU Run-key logic live in TrayApp.cs unnoticed.
+root = true
+
+[*]
+end_of_line = crlf
+insert_final_newline = true
+charset = utf-8
+
+[*.{cs,csproj,props,targets}]
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json}]
+indent_style = space
+indent_size = 2
+
+[*.cs]
+
+# --- dead code: the reason analysis is switched on at all -------------------
+dotnet_diagnostic.IDE0051.severity = warning   # unused private member
+dotnet_diagnostic.IDE0052.severity = warning   # private member written, never read
+dotnet_diagnostic.IDE0035.severity = warning   # unreachable code
+dotnet_diagnostic.IDE0059.severity = warning   # value assigned to a local is never used
+dotnet_diagnostic.IDE0060.severity = warning   # unused parameter
+
+# --- style: deliberately silent ---------------------------------------------
+# This code has been iterated on heavily and reads consistently. A mass
+# rewrite to satisfy a formatter would churn every file and improve nothing,
+# so the whole IDE style family stays out of the build. Individual rules above
+# opt back in.
+dotnet_analyzer_diagnostic.category-Style.severity = none

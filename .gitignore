@@ -1,0 +1,17 @@
+bin/
+obj/
+dist/
+
+# Design comparison sheets, regenerated on demand by the --render-* dev modes.
+*.png
+!docs/*.png
+
+# Generated from AppMarkPainter by build.ps1 on every build.
+src/Infolume/app.ico
+
+# Per-user IDE state.
+*.csproj.user
+
+# Test results and other build artifacts.
+artifacts/
+TestResults/
